@@ -9,15 +9,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
-  StatusBar,
   ActivityIndicator,
   Dimensions,
+  Animated,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useChatStore } from "../../store/chatStore";
+import { StatusBar } from "expo-status-bar";
 
 const { width } = Dimensions.get("window");
 const MAX_BUBBLE_WIDTH = width * 0.75;
+
+interface Message {
+  id: number;
+  content: string;
+  created_at: string;
+  room_id: string;
+  user_id: number;
+  username: string;
+  type?: "message" | "system";
+}
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
@@ -26,6 +37,7 @@ export default function ChatScreen() {
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   const {
     messages,
@@ -39,6 +51,12 @@ export default function ChatScreen() {
   } = useChatStore();
 
   useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
     if (!user) {
       router.replace("/");
       return;
@@ -56,7 +74,6 @@ export default function ChatScreen() {
     };
   }, [id, user]);
 
-  // Monitor WebSocket connection and auto-reconnect
   useEffect(() => {
     if (error && error.includes("Connection lost") && reconnectAttempts < 3) {
       reconnectTimeoutRef.current = setTimeout(() => {
@@ -104,29 +121,54 @@ export default function ChatScreen() {
     }
   };
 
-  const renderMessage = ({ item, index }: { item: any; index: number }) => {
-    // Handle system messages
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     if (item.type === "system") {
       return (
-        <View style={styles.systemMessageContainer}>
+        <Animated.View
+          style={[
+            styles.systemMessageContainer,
+            {
+              opacity: fadeAnim,
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.systemMessageText}>{item.content}</Text>
           <Text style={styles.systemMessageTime}>
             {formatTime(item.created_at)}
           </Text>
-        </View>
+        </Animated.View>
       );
     }
 
-    // Handle regular messages
     const isOwn = item.username === user?.username;
     const showUsername =
-      index === 0 || messages[index - 1]?.username !== item.username;
+      index === messages.length - 1 ||
+      messages[index - 1]?.username !== item.username;
 
     return (
-      <View
+      <Animated.View
         style={[
           styles.messageContainer,
           isOwn ? styles.ownMessageContainer : styles.otherMessageContainer,
+          {
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
         ]}
       >
         {!isOwn && showUsername && (
@@ -150,14 +192,29 @@ export default function ChatScreen() {
             {formatTime(item.created_at)}
           </Text>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
   const renderConnectionStatus = () => {
     if (!socket) {
       return (
-        <View style={styles.connectionStatus}>
+        <Animated.View
+          style={[
+            styles.connectionStatus,
+            {
+              opacity: fadeAnim,
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.connectionStatusText}>Disconnected</Text>
           <TouchableOpacity
             style={styles.reconnectButton}
@@ -170,7 +227,7 @@ export default function ChatScreen() {
           >
             <Text style={styles.reconnectButtonText}>Reconnect</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       );
     }
     return null;
@@ -179,7 +236,7 @@ export default function ChatScreen() {
   if (!currentRoom) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <StatusBar style="dark" />
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
@@ -192,14 +249,29 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
-          <View style={styles.header}>
+          <Animated.View
+            style={[
+              styles.header,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <TouchableOpacity
               style={styles.backButtonContainer}
               onPress={() => router.back()}
@@ -219,16 +291,32 @@ export default function ChatScreen() {
                 participants
               </Text>
             </View>
-          </View>
+          </Animated.View>
 
           {error && (
-            <TouchableOpacity
-              style={styles.error}
-              onPress={() => useChatStore.getState().setError(null)}
+            <Animated.View
+              style={[
+                styles.errorContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
               <Text style={styles.errorText}>{error}</Text>
-              <Text style={styles.errorDismiss}>Tap to dismiss</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => useChatStore.getState().setError(null)}
+              >
+                <Text style={styles.errorDismiss}>Dismiss</Text>
+              </TouchableOpacity>
+            </Animated.View>
           )}
 
           {renderConnectionStatus()}
@@ -248,7 +336,22 @@ export default function ChatScreen() {
             showsVerticalScrollIndicator={false}
           />
 
-          <View style={styles.inputContainer}>
+          <Animated.View
+            style={[
+              styles.inputContainer,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <TextInput
               style={styles.input}
               value={message}
@@ -272,18 +375,10 @@ export default function ChatScreen() {
               {isSending ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text
-                  style={[
-                    styles.sendButtonText,
-                    (!message.trim() || !socket) &&
-                      styles.sendButtonTextDisabled,
-                  ]}
-                >
-                  Send
-                </Text>
+                <Text style={styles.sendButtonText}>Send</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -297,7 +392,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === "android" ? 25 : 0,
   },
   keyboardView: {
     flex: 1,
@@ -315,21 +410,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f0f0f0",
     backgroundColor: "#fff",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   backButtonContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 15,
+    marginRight: 16,
   },
   backButton: {
     fontSize: 24,
@@ -339,17 +434,18 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     color: "#007AFF",
+    fontWeight: "500",
   },
   roomInfoContainer: {
     flex: 1,
   },
   roomName: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "600",
-    color: "#000",
+    color: "#333",
   },
   participantCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#666",
     marginTop: 2,
   },
@@ -357,7 +453,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContainer: {
-    padding: 15,
+    padding: 16,
     flexGrow: 1,
   },
   messageContainer: {
@@ -372,7 +468,7 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     padding: 12,
-    borderRadius: 20,
+    borderRadius: 16,
     maxWidth: "100%",
   },
   ownMessage: {
@@ -380,18 +476,18 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   otherMessage: {
-    backgroundColor: "#F0F0F0",
+    backgroundColor: "#f0f0f0",
     borderBottomLeftRadius: 4,
   },
   username: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#666",
     marginBottom: 4,
     marginLeft: 2,
   },
   messageText: {
     fontSize: 16,
-    color: "#000",
+    color: "#333",
     lineHeight: 22,
   },
   ownMessageText: {
@@ -413,40 +509,44 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: "#f0f0f0",
     backgroundColor: "#fff",
   },
   input: {
     flex: 1,
+    backgroundColor: "#f8f9fa",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#e1e4e8",
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingVertical: 10,
     marginRight: 10,
     maxHeight: 120,
     fontSize: 16,
-    backgroundColor: "#fff",
+    color: "#333",
   },
   sendButton: {
     backgroundColor: "#007AFF",
     borderRadius: 20,
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sendButtonDisabled: {
     backgroundColor: "#ccc",
+    shadowOpacity: 0,
+    elevation: 0,
   },
   sendButtonText: {
     color: "#fff",
-    fontWeight: "600",
     fontSize: 16,
-  },
-  sendButtonTextDisabled: {
-    opacity: 0.7,
+    fontWeight: "600",
   },
   connectionStatus: {
     flexDirection: "row",
@@ -454,12 +554,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: "#fff3cd",
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ffeeba",
+    margin: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ffeeba",
   },
   connectionStatusText: {
     color: "#856404",
     fontSize: 14,
+    fontWeight: "500",
   },
   reconnectButton: {
     backgroundColor: "#856404",
@@ -469,33 +572,34 @@ const styles = StyleSheet.create({
   },
   reconnectButtonText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
   },
-  error: {
+  errorContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#ffebeb",
-    marginHorizontal: 15,
-    marginTop: 10,
+    backgroundColor: "#ffebee",
+    margin: 12,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ffcdd2",
   },
   errorText: {
     flex: 1,
-    color: "#ff3b30",
+    color: "#d32f2f",
     fontSize: 14,
   },
   errorDismiss: {
-    color: "#ff3b30",
-    fontSize: 12,
-    marginLeft: 8,
-    opacity: 0.7,
+    color: "#d32f2f",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 12,
   },
   systemMessageContainer: {
     alignItems: "center",
-    marginVertical: 8,
+    marginVertical: 12,
     paddingHorizontal: 16,
   },
   systemMessageText: {
